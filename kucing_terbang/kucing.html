@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Rumah Kucing</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: radial-gradient(ellipse at center, #3a3550 0%, #1c1930 100%);
+    font-family: 'Segoe UI', Georgia, serif;
+    overflow: hidden; display: flex; align-items: center; justify-content: center;
+  }
+  .app { width: 800px; max-width: 96vw; }
+
+  .nav { display: flex; justify-content: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .nav button {
+    border: none; padding: 9px 16px; border-radius: 999px;
+    background: rgba(255,255,255,0.12); color: #eee6ff;
+    font-size: 13.5px; font-family: inherit; cursor: pointer;
+    transition: background .25s, transform .2s;
+  }
+  .nav button:hover { transform: translateY(-2px); }
+  .nav button.active {
+    background: #f5a623; color: #3a2000; font-weight: bold;
+    box-shadow: 0 4px 14px rgba(245,166,35,0.5);
+  }
+
+  .stage {
+    position: relative; width: 100%; height: 500px;
+    border-radius: 16px; overflow: hidden;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.45);
+  }
+  .room {
+    position: absolute; inset: 0; opacity: 0;
+    transform: translateX(40px) scale(0.98);
+    pointer-events: none;
+    transition: opacity .5s ease, transform .18s ease-out;
+  }
+  .room.active { opacity: 1; transform: translateX(0) scale(1); pointer-events: auto; }
+
+  .wall { position: absolute; top: 0; left: 0; right: 0; height: 70%; }
+  .floor { position: absolute; bottom: 0; left: 0; right: 0; height: 30%; }
+  .baseboard { position: absolute; bottom: 30%; left: 0; right: 0; height: 8px; background: #f3ead9; }
+
+  .tip {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    color: rgba(255,255,255,0.55); font-size: 11.5px; letter-spacing: .3px;
+    pointer-events: none; text-align: center; width: 92%;
+  }
+
+  .toast {
+    position: absolute; top: 14px; left: 50%;
+    transform: translateX(-50%) translateY(-14px);
+    background: rgba(30,20,45,0.88); color: #ffe9c9;
+    padding: 7px 16px; border-radius: 999px; font-size: 13px;
+    opacity: 0; transition: opacity .25s, transform .25s;
+    pointer-events: none; white-space: nowrap; z-index: 90;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ===== Jendela: dua daun yang membuka halus ===== */
+  .sash {
+    position: absolute; top: 0; bottom: 0; width: 50%;
+    background: rgba(255,255,255,0.26);
+    border: 1px solid rgba(255,255,255,0.55);
+    transition: transform .45s ease;
+    backface-visibility: hidden;
+  }
+  .sash.left { left: 0; transform-origin: left center; }
+  .sash.right { right: 0; transform-origin: right center; }
+
+  /* ================= RUANG TAMU ================= */
+  #living .wall { background: linear-gradient(180deg, #e9d2b4, #dcb98f); }
+  #living .floor { background: repeating-linear-gradient(90deg, rgba(0,0,0,0.06) 0 4px, transparent 4px 90px), linear-gradient(180deg, #b0784a, #8a5a30); }
+
+  .window { position:absolute; top:30px; left:40px; width:150px; height:160px; background:linear-gradient(180deg,#bfe6ff,#eaf7ff); border:9px solid #f7f2e7; border-radius:6px; box-shadow:0 0 24px rgba(255,255,255,.15); perspective:500px; cursor:pointer; }
+  .window.open .sash.left { transform: rotateY(-100deg); }
+  .window.open .sash.right { transform: rotateY(100deg); }
+  .sun { position:absolute; top:14px; left:10px; width:26px; height:26px; border-radius:50%; background:radial-gradient(circle,#fff6c9,#ffe28a); animation:glow 2.4s ease-in-out infinite alternate; }
+  @keyframes glow{0%{box-shadow:0 0 10px 3px rgba(255,226,138,.5);}100%{box-shadow:0 0 20px 8px rgba(255,226,138,.85);}}
+  .curtain{position:absolute;top:20px;width:34px;height:170px;background:linear-gradient(180deg,#e5988f,#d97b70);border-radius:8px 8px 3px 3px;transform-origin:top center;animation:curtainSway 4.5s ease-in-out infinite;}
+  .curtain.cl{left:18px;}
+  .curtain.cr{left:158px;animation-delay:.6s;}
+  @keyframes curtainSway{0%,100%{transform:rotate(-3deg);}50%{transform:rotate(3deg);}}
+
+  .frame{position:absolute;top:55px;right:70px;width:80px;height:62px;background:#f9f5ec;border:5px solid #b5793f;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 5px 8px rgba(0,0,0,.2);}
+
+  .lamp { position:absolute; top:20px; right:26px; width:30px; cursor:pointer; text-align:center; }
+  .lamp .shade { width:34px; height:24px; margin:0 auto; background:#e8b96a; border-radius:4px 4px 14px 14px; box-shadow:0 4px 10px rgba(0,0,0,.25); }
+  .lamp .pole { width:4px; height:34px; background:#8a5a30; margin:0 auto; }
+  .lamp .base { width:22px; height:6px; background:#6e441f; margin:0 auto; border-radius:3px; }
+  .lamp .light { position:absolute; top:18px; left:50%; transform:translateX(-50%); width:70px; height:70px; border-radius:50%; background:radial-gradient(circle, rgba(255,236,168,0.55), transparent 70%); opacity:0; transition:opacity .3s; }
+  .lamp.on .light { opacity:1; }
+  .lamp.on .shade { background:#ffd685; box-shadow:0 0 20px 8px rgba(255,214,133,.6); }
+
+  .sofa { position:absolute; bottom:26%; left:50%; transform:translateX(-50%); width:340px; }
+  .sofa-back { width:100%; height:80px; background:linear-gradient(180deg,#d9756b,#c15b52); border-radius:22px 22px 0 0; box-shadow: inset 0 -8px 14px rgba(0,0,0,.15); }
+  .sofa-seat { width:100%; height:46px; background:linear-gradient(180deg,#e08279,#c85e55); border-radius:0 0 16px 16px; position:relative; box-shadow: inset 0 6px 10px rgba(0,0,0,.12); }
+  .sofa-arm { position:absolute; bottom:0; width:46px; height:110px; background:linear-gradient(180deg,#d9756b,#c15b52); border-radius:18px; box-shadow: inset -6px 0 10px rgba(0,0,0,.12); }
+  .sofa-arm.left { left:-24px; }
+  .sofa-arm.right { right:-24px; }
+  .cushion { position:absolute; bottom:44px; width:78px; height:56px; background:#eb9088; border-radius:14px; box-shadow:0 5px 8px rgba(0,0,0,.12); }
+  .cushion.c1 { left:34px; }
+  .cushion.c2 { right:34px; }
+  .leg { position:absolute; bottom:-14px; width:10px; height:16px; background:#6e441f; border-radius:2px; }
+  .leg.l1 { left:6px; } .leg.l2 { right:6px; }
+
+  .rug2 { position:absolute; bottom:8%; left:50%; transform:translateX(-50%); width:280px; height:60px; background:#d8c19f; border:5px solid #c2a679; border-radius:50%; }
+
+  .cat-scale { position:absolute; inset:0; transform: scale(0.8); transform-origin: bottom center; }
+
+  .sleepy-cat { position: absolute; bottom: 66px; left: 50%; transform: translateX(-58%); width: 150px; height: 80px; cursor: pointer; animation: catBreathe 3.4s ease-in-out infinite; transform-origin: bottom center; }
+  @keyframes catBreathe { 0%,100%{ transform: translateX(-58%) scaleY(1);} 50%{ transform: translateX(-58%) scaleY(1.05);} }
+  .sleepy-cat.awake { animation: catAwakeIdle 2.4s ease-in-out infinite; }
+  @keyframes catAwakeIdle { 0%,100%{ transform: translateX(-58%) scale(1);} 50%{ transform: translateX(-58%) scale(1.015) translateY(-2px);} }
+  .sc-body { position:absolute; bottom:0; left:0; width:150px; height:52px; background: linear-gradient(160deg,#f7b46a,#ee9a4e 75%); border-radius: 50% 60% 45% 45% / 90% 90% 60% 60%; box-shadow: inset -10px -8px 16px rgba(0,0,0,.12); transition: border-radius .4s ease; }
+  .sleepy-cat.awake .sc-body { border-radius: 45% 55% 45% 45% / 60% 60% 55% 55%; }
+  .sc-head { position:absolute; bottom:18px; left:-6px; width:58px; height:52px; background: linear-gradient(155deg,#f7b46a,#ee9a4e 75%); border-radius: 50%; box-shadow: inset -8px -6px 12px rgba(0,0,0,.12); transition: transform .4s ease; }
+  .sleepy-cat.awake .sc-head { transform: translateY(-6px) rotate(-4deg); }
+  .sc-ear { position:absolute; width:0; height:0; border-left:11px solid transparent; border-right:11px solid transparent; border-bottom:18px solid #ee9a4e; transition: transform .4s ease; }
+  .sc-ear.l1 { top:-8px; left:2px; transform:rotate(-18deg); }
+  .sc-ear.l2 { top:-8px; left:30px; transform:rotate(18deg); }
+  .sleepy-cat.awake .sc-ear.l1 { transform: rotate(-6deg) translateY(-2px); }
+  .sleepy-cat.awake .sc-ear.l2 { transform: rotate(6deg) translateY(-2px); }
+  .sc-eye { position:absolute; top:24px; width:11px; height:3px; background:#5a3b28; border-radius:2px; transition: all .35s ease; }
+  .sc-eye.e1 { left:12px; transform:rotate(-8deg); }
+  .sc-eye.e2 { left:30px; transform:rotate(8deg); }
+  .sleepy-cat.awake .sc-eye { height: 8px; width: 8px; border-radius: 50%; background:#2b2b2b; top:21px; transform:none; }
+  .sc-nose { position:absolute; top:30px; left:22px; width:5px; height:4px; background:#ff8fa3; border-radius:50%; }
+  .sc-mouth { position:absolute; top:35px; left:19px; width:12px; height:6px; border-bottom:1.5px solid #6b4a34; border-radius:0 0 8px 8px; opacity:0; transition: opacity .3s ease; }
+  .sleepy-cat.awake .sc-mouth { opacity:1; }
+  .sc-whisker { position:absolute; height:1.5px; width:16px; background:rgba(90,60,40,.45); opacity:0; transition: opacity .3s ease; }
+  .sleepy-cat.awake .sc-whisker { opacity:1; }
+  .sc-whisker.w1 { top:27px; left:-14px; transform:rotate(-4deg); }
+  .sc-whisker.w2 { top:32px; left:-14px; }
+  .sc-whisker.w3 { top:27px; left:38px; transform:rotate(4deg); }
+  .sc-whisker.w4 { top:32px; left:38px; }
+  .sc-tail { position:absolute; bottom:6px; right:-26px; width:60px; height:24px; border: 11px solid #ee9a4e; border-left-color: transparent; border-bottom-color: transparent; border-radius: 50%; transform: rotate(-20deg); animation: tailTwitch 5s ease-in-out infinite; transform-origin: left center; }
+  @keyframes tailTwitch { 0%,85%,100% { transform: rotate(-20deg);} 90% { transform: rotate(-28deg);} 95% { transform: rotate(-14deg);} }
+  .sleepy-cat.awake .sc-tail { animation: tailWagAwake 1.1s ease-in-out infinite; }
+  @keyframes tailWagAwake { 0%,100% { transform: rotate(-24deg);} 50% { transform: rotate(-4deg);} }
+  .zzz { position:absolute; top:-6px; left:36px; font-size:14px; color:#7a5a3a; opacity:0; font-weight:bold; animation: zzzFloat 3.4s ease-in infinite; }
+  .zzz.z2 { left:48px; font-size:11px; animation-delay:.9s; }
+  .zzz.z3 { left:58px; font-size:9px; animation-delay:1.8s; }
+  .sleepy-cat.awake .zzz { display:none; }
+  @keyframes zzzFloat { 0%{opacity:0; transform: translate(0,0) scale(0.6);} 15%{opacity:.9;} 80%{opacity:0;} 100%{opacity:0; transform: translate(14px,-30px) scale(1);} }
+  .heart-burst { position:absolute; top:-10px; left:20px; font-size: 20px; opacity: 0; pointer-events:none; }
+  .heart-burst.show { animation: heartPop .9s ease forwards; }
+  @keyframes heartPop { 0%{opacity:0; transform: translateY(0) scale(0.4);} 30%{opacity:1; transform: translateY(-14px) scale(1.1);} 100%{opacity:0; transform: translateY(-34px) scale(0.9);} }
+
+  /* ================= DAPUR ================= */
+  #kitchen .wall { background: linear-gradient(180deg,#cdeaf0,#b7dee6); }
+  #kitchen .floor { background: repeating-conic-gradient(#d8cdb8 0deg 90deg, #cabf9f 90deg 180deg); background-size: 60px 60px; }
+
+  .k-window { position:absolute; top:34px; left:280px; width:130px; height:120px; background:linear-gradient(180deg,#bfe6ff,#eaf7ff); border:8px solid #fff; border-radius:6px; perspective:500px; cursor:pointer; }
+  .k-window.open .sash.left { transform: rotateY(-100deg); }
+  .k-window.open .sash.right { transform: rotateY(100deg); }
+  .k-plant { position:absolute; top:44px; left:262px; width:16px; height:16px; background:#4c8c52; border-radius:50% 50% 0 50%; }
+
+  .cabinet-top { position:absolute; top:24px; left:26px; width:190px; height:70px; background:linear-gradient(180deg,#f4e3c8,#e7cda2); border-radius:6px; box-shadow:0 6px 10px rgba(0,0,0,.15); perspective:400px; cursor:pointer; }
+  .cabinet-top .pantry { position:absolute; inset:8px; background:#fff8ea; border-radius:4px; display:flex; align-items:center; justify-content:center; gap:12px; font-size:17px; }
+  .cabinet-top .cdoor { position:absolute; top:8px; bottom:8px; width:82px; background:#f8ecd8; border:3px solid #d8b981; border-radius:4px; transition: transform .45s ease; }
+  .cabinet-top .cdoor.cd1{left:8px; transform-origin:left center;} .cabinet-top .cdoor.cd2{right:8px; transform-origin:right center;}
+  .cabinet-top .cdoor::before{ content:""; position:absolute; right:8px; top:50%; width:5px;height:5px;background:#a97c3f;border-radius:50%; }
+  .cabinet-top.open .cdoor.cd1 { transform: rotateY(-100deg); pointer-events:none; }
+  .cabinet-top.open .cdoor.cd2 { transform: rotateY(100deg); pointer-events:none; }
+
+  .utensil-rack { position:absolute; top:40px; left:425px; width:250px; height:6px; background:#5a5a60; border-radius:3px; cursor:pointer; }
+  .utensil-rack .hook { position:absolute; top:6px; width:2px; height:14px; background:#5a5a60; }
+  .utensil-rack .hook.h1{left:24px;} .utensil-rack .hook.h2{left:94px;} .utensil-rack .hook.h3{left:164px;}
+  .utensil-rack .pan { position:absolute; top:18px; width:28px; height:28px; border-radius:50%; background:#9aa1a8; border:5px solid #5a5a60; animation: panSway 3.6s ease-in-out infinite; transform-origin: top center; }
+  .utensil-rack .pan::after { content:""; position:absolute; top:11px; right:-15px; width:16px; height:4px; background:#5a5a60; border-radius:2px; }
+  .utensil-rack .pan.p1 { left:10px; }
+  .utensil-rack .pan.p2 { left:80px; background:#c9604f; animation-delay:.4s; }
+  .utensil-rack .pan.p3 { left:150px; animation-delay:.8s; }
+  @keyframes panSway { 0%,100%{ transform: rotate(-4deg);} 50%{ transform: rotate(4deg);} }
+
+  .counter { position:absolute; bottom:30%; left:0; width:100%; height:100px; background:linear-gradient(180deg,#e3b27a,#c98f52); box-shadow: 0 -4px 0 #f4d9ad inset; }
+  .counter-top { position:absolute; bottom:30%; left:0; width:100%; height:14px; background:#8a5a30; }
+
+  .stove { position:absolute; bottom:calc(30% + 14px); left:56px; width:110px; height:70px; background:#4b4b52; border-radius:6px 6px 0 0; cursor:pointer; box-shadow:0 -4px 8px rgba(0,0,0,.2); }
+  .stove .burner { position:absolute; top:12px; width:26px; height:26px; border-radius:50%; background:#2c2c30; border:3px solid #6b6b72; }
+  .stove .burner.b1{left:12px;} .stove .burner.b2{right:12px;}
+  .flame { position:absolute; top:-16px; left:50%; transform:translateX(-50%) scale(0); width:16px; height:22px; background:radial-gradient(circle,#fff4b0,#ff9a3c 60%,#ff5a3c); border-radius:50% 50% 50% 50% / 60% 60% 40% 40%; opacity:0; transition:opacity .2s, transform .2s; }
+  .stove.on .burner.b1 .flame, .stove.on .burner.b2 .flame { opacity:1; transform:translateX(-50%) scale(1); animation: flicker 0.5s ease-in-out infinite alternate; }
+  @keyframes flicker { 0%{ transform:translateX(-50%) scale(1);} 100%{ transform:translateX(-50%) scale(1.12) translateY(-2px);} }
+  .pot { position:absolute; top:-30px; left:50%; transform:translateX(-50%); width:34px; height:22px; background:#8f9096; border-radius:4px 4px 8px 8px; display:none; }
+  .stove.on .pot { display:block; }
+  .stove.cooked .pot { background:#e2b25a; }
+  .stove.cooked .pot::after { content:"🍲"; position:absolute; top:-16px; left:50%; transform:translateX(-50%); font-size:15px; }
+  .steam { position:absolute; top:-14px; left:50%; width:4px; height:14px; background:rgba(255,255,255,.7); border-radius:4px; opacity:0; }
+  .stove.on .steam { animation: steamRise 1.6s ease-in infinite; }
+  @keyframes steamRise { 0%{opacity:0; transform:translate(-50%,0) scaleY(.6);} 30%{opacity:.8;} 100%{opacity:0; transform:translate(-30%,-22px) scaleY(1.2);} }
+  .pot-hint { position:absolute; top:-52px; left:50%; transform:translateX(-50%); font-size:10px; background:#2e7d32; color:#fff; padding:3px 7px; border-radius:8px; opacity:0; transition:opacity .3s; white-space:nowrap; pointer-events:none; }
+  .pot-hint.show { opacity:1; }
+
+  .sink { position:absolute; left:186px; bottom: calc(30% + 14px); width:140px; height:46px; cursor:pointer; }
+  .sink .basin { position:absolute; bottom:0; left:8px; right:8px; height:26px; background:#cfd6da; border-radius:6px; box-shadow: inset 0 4px 8px rgba(0,0,0,.25); }
+  .sink .faucet-pipe { position:absolute; bottom:26px; left:50%; transform:translateX(-50%); width:5px; height:16px; background:#9aa3a9; border-radius:2px; }
+  .sink .faucet-spout { position:absolute; bottom:40px; left:50%; transform:translateX(-16px); width:22px; height:5px; background:#9aa3a9; border-radius:3px; }
+  .sink .stream { position:absolute; bottom:26px; left:50%; transform:translateX(6px); width:3px; height:0; background: linear-gradient(180deg, #bfe6ff, #7fc4f0); opacity:0; transition: height .25s ease, opacity .25s; border-radius:2px; }
+  .sink.running .stream { height:14px; opacity:.85; animation: waterFlicker .3s linear infinite; }
+  @keyframes waterFlicker { 0%,100%{opacity:.75;} 50%{opacity:1;} }
+
+  .toaster { position:absolute; left:346px; bottom: calc(30% + 14px); width:50px; height:34px; background:#d0433a; border-radius:6px 6px 3px 3px; cursor:pointer; box-shadow:0 4px 8px rgba(0,0,0,.2); }
+  .toaster .slot { position:absolute; top:4px; left:8px; width:14px; height:4px; background:#5a1c17; border-radius:2px; }
+  .toaster .slot.s2 { left:28px; }
+  .toaster .bread { position:absolute; top:4px; left:8px; width:14px; height:16px; background:#e8b96a; border-radius:2px 2px 4px 4px; transform: translateY(0); transition: transform .35s ease; }
+  .toaster .bread.b2 { left:28px; }
+  .toaster.popped .bread { transform: translateY(-18px); }
+
+  .microwave { position:absolute; left:412px; bottom: calc(30% + 14px); width:84px; height:50px; background:#3a3d42; border-radius:5px; cursor:pointer; box-shadow:0 4px 8px rgba(0,0,0,.2); }
+  .microwave .mw-door { position:absolute; top:5px; bottom:5px; left:5px; right:24px; background:#1e2124; border:2px solid #55585d; border-radius:3px; overflow:hidden; }
+  .microwave .mw-glow { position:absolute; inset:0; background: rgba(255,235,150,0); transition: background .3s; }
+  .microwave.on .mw-glow { background: rgba(255,235,150,0.35); }
+  .microwave .mw-plate { position:absolute; bottom:5px; left:50%; width:70%; height:3px; background:#666; border-radius:50%; transform:translateX(-50%); }
+  .microwave .mw-btn { position:absolute; right:8px; top:10px; width:7px; height:7px; border-radius:50%; background:#222; transition: background .3s, box-shadow .3s; }
+  .microwave.on .mw-btn { background:#7CFC9A; box-shadow:0 0 6px 2px rgba(124,252,154,.7); }
+
+  .fruit-bowl { position:absolute; left:512px; bottom: calc(30% + 14px); width:60px; height:26px; cursor:pointer; }
+  .fruit-bowl .bowl { position:absolute; bottom:0; width:60px; height:16px; background:linear-gradient(180deg,#d8935a,#b3703a); border-radius:0 0 30px 30px; }
+  .fruit-bowl .fruits { position:absolute; top:-13px; left:6px; font-size:16px; }
+
+  .fridge { position:absolute; bottom:30%; right:40px; width:90px; height:150px; background:linear-gradient(180deg,#f3f6f8,#dfe6ea); border-radius:8px; box-shadow:0 8px 14px rgba(0,0,0,.2); perspective: 400px; }
+  .fridge .door-panel { position:absolute; inset:6px; background:linear-gradient(180deg,#fff,#e7edf0); border-radius:6px; transform-origin:left center; transition: transform .5s ease; box-shadow: inset 0 0 0 3px rgba(0,0,0,.05); cursor:pointer; }
+  .fridge .handle { position:absolute; top:20px; right:8px; width:5px; height:34px; background:#b7c0c6; border-radius:3px; }
+  .fridge.open .door-panel { transform: rotateY(-105deg); pointer-events:none; }
+  .fridge .inside { position:absolute; inset:6px; background:#dff0ea; border-radius:6px; overflow:hidden; padding:5px; display:flex; flex-wrap:wrap; align-content:flex-start; justify-content:center; gap:5px; }
+  .fridge .food { font-size:16px; cursor:pointer; line-height:1; padding:2px; transition: transform .2s ease, opacity .2s ease; }
+  .fridge .food:hover { transform: scale(1.2); }
+  .fridge .food.used { opacity:.3; }
+  .fridge .food.cream.bounce { animation: creamBounce .5s ease; }
+  @keyframes creamBounce { 0%,100%{transform:scale(1);} 50%{transform:scale(1.3) rotate(-8deg);} }
+
+  .k-rug { position:absolute; bottom:6%; left:50%; transform:translateX(-50%); width:220px; height:50px; background:#cfe3e6; border:5px solid #b6d2d6; border-radius:50%; }
+
+  /* ================= KAMAR TIDUR ================= */
+  #bedroom .wall { background: linear-gradient(180deg,#d9c9ec,#c6b2e0); }
+  #bedroom .floor { background: repeating-linear-gradient(90deg, rgba(0,0,0,0.05) 0 4px, transparent 4px 70px), linear-gradient(180deg,#b79b6b,#98803f); }
+
+  .b-window { position:absolute; top:30px; right:36px; width:120px; height:140px; background: linear-gradient(180deg,#4a4870,#312f52); border:8px solid #efe7fb; border-radius:6px; perspective:500px; cursor:pointer; }
+  .b-window.open .sash.left { transform: rotateY(-100deg); }
+  .b-window.open .sash.right { transform: rotateY(100deg); }
+  .moon { position:absolute; top:14px; right:14px; width:22px; height:22px; border-radius:50%; background:#fdf6e3; box-shadow:0 0 16px 6px rgba(253,246,227,.5); }
+  .star { position:absolute; background:#fff; border-radius:50%; animation: twinkle 2s ease-in-out infinite; }
+  .star.s1{ width:3px;height:3px; top:24px; left:16px; }
+  .star.s2{ width:2px;height:2px; top:60px; left:40px; animation-delay:.6s; }
+  .star.s3{ width:3px;height:3px; top:90px; left:20px; animation-delay:1.1s; }
+  @keyframes twinkle { 0%,100%{opacity:.3;} 50%{opacity:1;} }
+
+  .wardrobe { position:absolute; top:22px; left:26px; width:110px; height:210px; background:linear-gradient(180deg,#8a6a45,#6e5233); border-radius:6px; box-shadow:0 8px 14px rgba(0,0,0,.25); cursor:pointer; perspective: 500px; }
+  .wardrobe .wdoor { position:absolute; top:6px; bottom:6px; width:48px; background:linear-gradient(180deg,#a3805a,#8a6a45); border:2px solid #6e5233; border-radius:4px; transition: transform .5s ease; }
+  .wardrobe .wdoor.wd1 { left:6px; transform-origin: left center; }
+  .wardrobe .wdoor.wd2 { right:6px; transform-origin: right center; }
+  .wardrobe.open .wdoor.wd1 { transform: rotateY(-100deg); }
+  .wardrobe.open .wdoor.wd2 { transform: rotateY(100deg); }
+  .wardrobe .inside { position:absolute; top:6px; bottom:6px; left:6px; right:6px; background:#3e2f1c; border-radius:4px; }
+  .wardrobe .inside::after { content:"👕👗🧥"; position:absolute; top:16px; left:10px; font-size:13px; }
+
+  .bed { position:absolute; bottom:16%; left:40px; width:260px; height:150px; }
+  .headboard { position:absolute; left:0; top:0; width:26px; height:150px; background:linear-gradient(180deg,#b79b6b,#98803f); border-radius:8px 0 0 8px; }
+  .mattress { position:absolute; left:26px; top:26px; width:234px; height:124px; background:#f4ede1; border-radius:0 14px 14px 0; box-shadow: inset 0 8px 10px rgba(0,0,0,.06); }
+  .blanket { position:absolute; left:26px; top:70px; width:234px; height:80px; background:linear-gradient(160deg,#8fb4d9,#6f97c2); border-radius:0 14px 24px 10px; box-shadow: inset 0 6px 10px rgba(0,0,0,.1); }
+  .blanket::before { content:""; position:absolute; top:10px; left:14px; right:14px; height:4px; background:rgba(255,255,255,.35); border-radius:4px; }
+  .pillow { position:absolute; left:36px; top:34px; width:80px; height:46px; background:#fff; border-radius:14px; box-shadow:0 4px 6px rgba(0,0,0,.1); }
+
+  .laptop { position:absolute; left:206px; bottom: calc(16% + 76px); width:66px; cursor:pointer; z-index:5; }
+  .lp-screen { width:58px; height:40px; margin:0 auto; background:#2b2d33; border:3px solid #1d1f24; border-radius:4px 4px 0 0; transform-origin:bottom center; transform:scaleY(0.06); transition: transform .4s ease; position:relative; overflow:hidden; }
+  .laptop.open .lp-screen { transform: scaleY(1); }
+  .lp-glow { position:absolute; inset:3px; background: linear-gradient(160deg,#8fd9ff,#4a90d9); opacity:0; transition:opacity .35s ease .15s; }
+  .laptop.open .lp-glow { opacity:1; }
+  .lp-glow::after { content:"⌨"; position:absolute; bottom:2px; right:4px; font-size:9px; color:rgba(255,255,255,.7); }
+  .lp-base { width:66px; height:7px; background:linear-gradient(180deg,#dfe3e6,#b9c0c5); border-radius:0 0 6px 6px; box-shadow:0 3px 5px rgba(0,0,0,.25); }
+
+  .nightstand { position:absolute; bottom:16%; left:310px; width:60px; height:70px; background:linear-gradient(180deg,#a3805a,#8a6a45); border-radius:6px; box-shadow:0 6px 10px rgba(0,0,0,.2); }
+  .n-lamp { position:absolute; bottom:calc(16% + 70px); left:318px; width:34px; cursor:pointer; text-align:center; z-index:4; }
+  .n-lamp .shade { width:24px; height:18px; margin:0 auto; background:#e8b96a; border-radius:4px 4px 11px 11px; }
+  .n-lamp .pole { width:3px; height:13px; background:#6e441f; margin:0 auto; }
+  .n-lamp .light { position:absolute; top:8px; left:50%; transform:translateX(-50%); width:58px; height:58px; border-radius:50%; background:radial-gradient(circle, rgba(255,236,168,0.55), transparent 70%); opacity:0; transition:opacity .3s; }
+  .n-lamp.on .light { opacity:1; }
+  .n-lamp.on .shade { background:#ffd685; box-shadow:0 0 18px 8px rgba(255,214,133,.55); }
+
+  .phone { position:absolute; left:357px; bottom: calc(16% + 72px); width:20px; height:34px; background:#141416; border-radius:4px; cursor:pointer; box-shadow:0 3px 6px rgba(0,0,0,.3); display:flex; align-items:center; justify-content:center; z-index:4; }
+  .ph-screen { width:16px; height:29px; background:#000; border-radius:2px; color:transparent; font-size:5.5px; display:flex; align-items:center; justify-content:center; transition: background .3s, color .3s; text-align:center; line-height:1.1; }
+  .phone.on .ph-screen { background: linear-gradient(180deg,#8ec9ff,#4a90d9); color:#fff; box-shadow:0 0 10px 3px rgba(142,201,255,.6); }
+
+  .b-rug { position:absolute; bottom:5%; left:50%; transform:translateX(-50%); width:230px; height:55px; background:#e3d3c2; border:5px solid #cdb99f; border-radius:50%; }
+
+  /* ================= LUAR RUMAH ================= */
+  #outside .wall { background: linear-gradient(180deg, #7ec8f0 0%, #bfe6ff 100%); }
+  #outside .floor { background: linear-gradient(180deg, #8fc55d, #5f9e3d); }
+  .o-sun { position:absolute; top:26px; left:46px; width:48px; height:48px; border-radius:50%; background:radial-gradient(circle,#fff6c9,#ffe28a); box-shadow:0 0 30px 12px rgba(255,226,138,.55); animation: glow 2.6s ease-in-out infinite alternate; }
+
+  .house-facade { position:absolute; bottom:30%; left:430px; width:220px; height:150px; cursor:pointer; }
+  .hf-roof { position:absolute; top:-52px; left:-10px; width:0; height:0; border-left:120px solid transparent; border-right:120px solid transparent; border-bottom:58px solid #a8453a; }
+  .hf-body { position:absolute; top:6px; left:0; width:220px; height:140px; background:linear-gradient(180deg,#e9d2b4,#dcb98f); border-radius:4px; box-shadow:0 12px 22px rgba(0,0,0,.28); }
+  .hf-door { position:absolute; bottom:0; left:90px; width:40px; height:70px; background:#8a5630; border-radius:6px 6px 0 0; border:3px solid #6e441f; }
+  .hf-win { position:absolute; top:30px; width:44px; height:44px; background:linear-gradient(180deg,#bfe6ff,#eaf7ff); border:4px solid #fff; border-radius:4px; }
+  .hf-win.w1{ left:18px; } .hf-win.w2{ right:18px; }
+
+  .plant-pot2 { position:absolute; bottom:30%; width:40px; cursor:pointer; }
+  .plant-pot2.p1 { left:40px; } .plant-pot2.p2 { left:112px; } .plant-pot2.p3 { left:184px; }
+  .plant-pot2 .pot2-base { width:40px; height:30px; background:linear-gradient(180deg,#c96b4e,#a84f36); border-radius:0 0 8px 8px; }
+  .plant-pot2 .stem { position:absolute; bottom:26px; left:50%; transform:translateX(-50%); width:3px; height:16px; background:#4c8c52; }
+  .plant-pot2 .flower { position:absolute; bottom:40px; left:50%; transform:translateX(-50%) scale(0.7); width:16px; height:16px; border-radius:50%; background:#e8935a; transition: transform .4s ease, background .4s ease; }
+  .plant-pot2.watered .flower { transform:translateX(-50%) scale(1.2); background:#ff9fc7; }
+  .plant-pot2 .droplet { position:absolute; top:16px; left:50%; transform:translateX(-50%); font-size:12px; opacity:0; }
+  .plant-pot2.watered .droplet { animation: dropFall 0.9s ease; }
+  @keyframes dropFall { 0%{opacity:1; transform:translate(-50%,0);} 100%{opacity:0; transform:translate(-50%,30px);} }
+
+  .car { position:absolute; bottom:30%; left:250px; width:150px; cursor:pointer; }
+  .car .c-body { width:150px; height:44px; background:linear-gradient(180deg,#e05252,#c23e3e); border-radius:20px 20px 8px 8px; position:relative; box-shadow:0 8px 14px rgba(0,0,0,.25); }
+  .car .cabin { position:absolute; top:-24px; left:26px; width:90px; height:30px; background:linear-gradient(180deg,#e05252,#c23e3e); border-radius:16px 16px 0 0; }
+  .car .c-win { position:absolute; top:-18px; left:34px; width:32px; height:18px; background:#bfe6ff; border-radius:6px 6px 0 0; }
+  .car .c-win.w2 { left:78px; }
+  .car .wheel { position:absolute; bottom:-10px; width:26px; height:26px; border-radius:50%; background:#222; border:4px solid #666; }
+  .car .wheel.w1{left:16px;} .car .wheel.w2{right:16px;}
+  .car.in { animation: carShake 0.4s ease-in-out infinite; }
+  @keyframes carShake { 0%,100%{ transform: translateX(0);} 50%{ transform: translateX(3px);} }
+
+  .person { position:absolute; bottom:30%; left:660px; font-size:46px; cursor:pointer; transition: transform .2s ease; line-height:1; }
+  .person:hover { transform: scale(1.08); }
+  .person.talk { animation: wave 0.4s ease; }
+  @keyframes wave { 0%,100%{transform:rotate(0deg);} 50%{transform:rotate(-10deg);} }
+  .speech { position:absolute; top:-30px; left:50%; transform:translateX(-50%) scale(0); background:#fff; color:#333; font-size:11px; padding:4px 8px; border-radius:10px; white-space:nowrap; opacity:0; transition: transform .25s ease, opacity .25s ease; }
+  .person.talk .speech { transform:translateX(-50%) scale(1); opacity:1; }
+
+  /* ===== KARAKTER PEMAIN ===== */
+  .controls-hint { text-align:center; color:#cfc7e6; font-size:12px; margin: -4px 0 10px; letter-spacing:.2px; }
+  .controls-hint b { color:#f5a623; }
+  #character {
+    position: absolute; width: 46px; height: 82px; z-index: 60;
+    pointer-events: none; left: 150px; top: 400px;
+  }
+  .char-shadow { position:absolute; bottom:-5px; left:50%; transform:translateX(-50%); width:35px; height:11px; background:rgba(0,0,0,.28); border-radius:50%; filter:blur(1px); transition: transform .25s ease, opacity .25s ease; }
+  .char-flip { position:relative; width:100%; height:100%; transform-origin:center bottom; transition: transform .15s ease; }
+  #character.facing-left .char-flip { transform: scaleX(-1); }
+  .char-head { position:absolute; top:0; left:50%; transform:translateX(-50%); width:24px; height:24px; border-radius:50%; background:#f2c49b; box-shadow: inset -3px -2px 0 rgba(0,0,0,.06); }
+  .char-head::after { content:""; position:absolute; top:-4px; left:1px; width:22px; height:12px; background:#4a3222; border-radius:12px 12px 0 0; }
+  .char-shirt { position:absolute; top:22px; left:50%; transform:translateX(-50%); width:30px; height:28px; background:linear-gradient(160deg,#3f7fe0,#2a5fc2); border-radius:8px; box-shadow: inset -4px -4px 0 rgba(0,0,0,.12); }
+  .char-legs { position:absolute; top:47px; left:50%; transform:translateX(-50%); width:30px; height:30px; display:flex; justify-content:space-between; }
+  .char-legs .char-leg { width:12px; height:30px; background:linear-gradient(160deg,#2f5fce,#1f4aa8); border-radius:0 0 5px 5px; transform-origin: top center; }
+  #character.walking .char-legs .char-leg.l { animation: legSwing 0.32s ease-in-out infinite; }
+  #character.walking .char-legs .char-leg.r { animation: legSwing 0.32s ease-in-out infinite; animation-delay: 0.16s; }
+  @keyframes legSwing { 0%,100%{ transform: rotate(-16deg);} 50%{ transform: rotate(16deg);} }
+
+  /* Lompat */
+  #character.jumping { animation: charHop 0.5s ease; }
+  @keyframes charHop {
+    0%   { transform: translateY(0); }
+    40%  { transform: translateY(-34px); }
+    60%  { transform: translateY(-34px); }
+    100% { transform: translateY(0); }
+  }
+  #character.jumping .char-shadow { animation: shadowShrink 0.5s ease; }
+  @keyframes shadowShrink {
+    0%, 100% { transform: translateX(-50%) scale(1); opacity: .8; }
+    50%      { transform: translateX(-50%) scale(0.55); opacity: .4; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="nav">
+    <button class="active" data-room="living" onclick="goRoom('living')">🛋️ Ruang Tamu</button>
+    <button data-room="kitchen" onclick="goRoom('kitchen')">🍳 Dapur</button>
+    <button data-room="bedroom" onclick="goRoom('bedroom')">🛏️ Kamar Tidur</button>
+    <button data-room="outside" onclick="goRoom('outside')">🌳 Luar Rumah</button>
+  </div>
+  <div class="controls-hint">Gerakkan karakter dengan <b>WASD</b> / <b>panah</b>, tekan <b>Spasi</b> untuk lompat ⌨️</div>
+
+  <div class="stage">
+    <div class="toast" id="toast"></div>
+
+    <!-- ================= RUANG TAMU ================= -->
+    <div class="room active" id="living">
+      <div class="wall">
+        <div class="window" onclick="toggleClass(this,'open'); showToast(this.classList.contains('open') ? 'Jendela dibuka 🌬️' : 'Jendela ditutup')">
+          <div class="sun"></div>
+          <div class="sash left"></div>
+          <div class="sash right"></div>
+        </div>
+        <div class="curtain cl"></div>
+        <div class="curtain cr"></div>
+        <div class="frame">🖼️</div>
+        <div class="lamp" onclick="toggleClass(this,'on'); showToast(this.classList.contains('on') ? 'Lampu dinyalakan' : 'Lampu dimatikan')">
+          <div class="light"></div>
+          <div class="shade"></div>
+          <div class="pole"></div>
+          <div class="base"></div>
+        </div>
+      </div>
+      <div class="floor"></div>
+      <div class="baseboard"></div>
+
+      <div class="rug2"></div>
+      <div class="sofa">
+        <div class="sofa-arm left"><div class="leg l1"></div></div>
+        <div class="sofa-arm right"><div class="leg l2"></div></div>
+        <div class="sofa-back"></div>
+        <div class="cushion c1"></div>
+        <div class="cushion c2"></div>
+        <div class="sofa-seat"></div>
+
+        <div class="cat-scale">
+        <div class="sleepy-cat" id="cat" onclick="toggleCatSleep(this)">
+          <div class="sc-tail"></div>
+          <div class="sc-body"></div>
+          <div class="sc-whisker w1"></div>
+          <div class="sc-whisker w2"></div>
+          <div class="sc-whisker w3"></div>
+          <div class="sc-whisker w4"></div>
+          <div class="sc-head">
+            <div class="sc-ear l1"></div>
+            <div class="sc-ear l2"></div>
+            <div class="sc-eye e1"></div>
+            <div class="sc-eye e2"></div>
+            <div class="sc-nose"></div>
+            <div class="sc-mouth"></div>
+          </div>
+          <div class="zzz z1">Z</div>
+          <div class="zzz z2">z</div>
+          <div class="zzz z3">z</div>
+          <div class="heart-burst">💗</div>
+        </div>
+        </div>
+      </div>
+      <div class="tip">Klik jendela, lampu, atau kucingnya. Pakai menu atas untuk pindah ruangan ✨</div>
+    </div>
+
+    <!-- ================= DAPUR ================= -->
+    <div class="room" id="kitchen">
+      <div class="wall">
+        <div class="cabinet-top" onclick="toggleCabinet(this)">
+          <div class="pantry">
+            <span onclick="snackFridge('Beras untuk nasi 🍚', event)">🍚</span>
+            <span onclick="snackFridge('Tomat segar dari lemari 🍅', event)">🍅</span>
+            <span onclick="snackFridge('Bumbu dapur lengkap 🧂', event)">🧂</span>
+          </div>
+          <div class="cdoor cd1"></div>
+          <div class="cdoor cd2"></div>
+        </div>
+        <div class="k-window" onclick="toggleClass(this,'open'); showToast(this.classList.contains('open') ? 'Jendela dapur dibuka 🌬️' : 'Jendela dapur ditutup')">
+          <div class="sash left"></div>
+          <div class="sash right"></div>
+        </div>
+        <div class="k-plant"></div>
+      </div>
+
+      <div class="utensil-rack" onclick="showToast('Peralatan masak lengkap 🍳')">
+        <div class="hook h1"></div><div class="hook h2"></div><div class="hook h3"></div>
+        <div class="pan p1"></div>
+        <div class="pan p2"></div>
+        <div class="pan p3"></div>
+      </div>
+
+      <div class="counter"></div>
+      <div class="counter-top"></div>
+      <div class="floor"></div>
+
+      <div class="stove" onclick="toggleStove(this)">
+        <div class="pot-hint" id="potHint">Bahan siap dimasak! 🍲</div>
+        <div class="burner b1"><div class="flame"></div><div class="steam"></div></div>
+        <div class="burner b2"><div class="flame"></div></div>
+        <div class="pot"></div>
+      </div>
+
+      <div class="sink" onclick="toggleClass(this,'running'); showToast(this.classList.contains('running') ? 'Keran air dinyalakan 💧' : 'Keran air dimatikan')">
+        <div class="faucet-spout"></div>
+        <div class="faucet-pipe"></div>
+        <div class="stream"></div>
+        <div class="basin"></div>
+      </div>
+
+      <div class="toaster" onclick="toggleClass(this,'popped'); showToast(this.classList.contains('popped') ? 'Roti panggang siap! 🍞' : 'Toaster direset')">
+        <div class="slot"></div><div class="slot s2"></div>
+        <div class="bread"></div><div class="bread b2"></div>
+      </div>
+
+      <div class="microwave" onclick="toggleClass(this,'on'); showToast(this.classList.contains('on') ? 'Microwave menyala 🔔' : 'Microwave dimatikan')">
+        <div class="mw-door"><div class="mw-glow"></div><div class="mw-plate"></div></div>
+        <div class="mw-btn"></div>
+      </div>
+
+      <div class="fruit-bowl" onclick="showToast('Buah segar dari kebun 🍎🍌🍇')">
+        <div class="bowl"></div>
+        <div class="fruits">🍎🍌🍇</div>
+      </div>
+
+      <div class="fridge">
+        <div class="inside">
+          <div class="food milk" onclick="snackFridge('Susu segar 🥛', event)">🥛</div>
+          <div class="food cheese" onclick="snackFridge('Keju enak 🧀', event)">🧀</div>
+          <div class="food beef" onclick="addIngredient('beef', this, event)">🥩</div>
+          <div class="food carrot" onclick="addIngredient('carrot', this, event)">🥕</div>
+          <div class="food cream" onclick="eatCream(this, event)">🍦</div>
+        </div>
+        <div class="door-panel" onclick="toggleFridge(this)"><div class="handle"></div></div>
+      </div>
+      <div class="k-rug"></div>
+      <div class="tip">Ambil daging & wortel dari kulkas, nyalakan kompor untuk masak sup. Cream bisa langsung dimakan 🍦</div>
+    </div>
+
+    <!-- ================= KAMAR TIDUR ================= -->
+    <div class="room" id="bedroom">
+      <div class="wall">
+        <div class="b-window" onclick="toggleClass(this,'open'); showToast(this.classList.contains('open') ? 'Jendela kamar dibuka 🌬️' : 'Jendela kamar ditutup')">
+          <div class="moon"></div>
+          <div class="star s1"></div>
+          <div class="star s2"></div>
+          <div class="star s3"></div>
+          <div class="sash left"></div>
+          <div class="sash right"></div>
+        </div>
+        <div class="wardrobe" onclick="toggleClass(this,'open'); showToast(this.classList.contains('open') ? 'Lemari dibuka' : 'Lemari ditutup')">
+          <div class="inside"></div>
+          <div class="wdoor wd1"></div>
+          <div class="wdoor wd2"></div>
+        </div>
+      </div>
+      <div class="floor"></div>
+      <div class="baseboard"></div>
+
+      <div class="b-rug"></div>
+      <div class="bed">
+        <div class="headboard"></div>
+        <div class="mattress"></div>
+        <div class="pillow"></div>
+        <div class="blanket"></div>
+      </div>
+
+      <div class="laptop" onclick="toggleClass(this,'open'); showToast(this.classList.contains('open') ? 'Laptop dinyalakan 💻' : 'Laptop ditutup')">
+        <div class="lp-screen"><div class="lp-glow"></div></div>
+        <div class="lp-base"></div>
+      </div>
+
+      <div class="nightstand"></div>
+      <div class="n-lamp" onclick="toggleClass(this,'on'); showToast(this.classList.contains('on') ? 'Lampu tidur dinyalakan' : 'Lampu tidur dimatikan')">
+        <div class="light"></div>
+        <div class="shade"></div>
+        <div class="pole"></div>
+      </div>
+      <div class="phone" onclick="toggleClass(this,'on'); showToast(this.classList.contains('on') ? 'HP dinyalakan 📱' : 'Layar HP dimatikan')">
+        <div class="ph-screen">09:41</div>
+      </div>
+
+      <div class="tip">Klik jendela, lemari, laptop, HP, atau lampu tidur untuk memakainya 🌙</div>
+    </div>
+
+    <!-- ================= LUAR RUMAH ================= -->
+    <div class="room" id="outside">
+      <div class="wall"><div class="o-sun"></div></div>
+      <div class="floor"></div>
+
+      <div class="house-facade" onclick="viewHouse()">
+        <div class="hf-roof"></div>
+        <div class="hf-body"></div>
+        <div class="hf-win w1"></div>
+        <div class="hf-win w2"></div>
+        <div class="hf-door"></div>
+      </div>
+
+      <div class="plant-pot2 p1" onclick="waterPlant(this)">
+        <div class="droplet">💧</div>
+        <div class="flower"></div>
+        <div class="stem"></div>
+        <div class="pot2-base"></div>
+      </div>
+      <div class="plant-pot2 p2" onclick="waterPlant(this)">
+        <div class="droplet">💧</div>
+        <div class="flower"></div>
+        <div class="stem"></div>
+        <div class="pot2-base"></div>
+      </div>
+      <div class="plant-pot2 p3" onclick="waterPlant(this)">
+        <div class="droplet">💧</div>
+        <div class="flower"></div>
+        <div class="stem"></div>
+        <div class="pot2-base"></div>
+      </div>
+
+      <div class="car" onclick="toggleCar(this)">
+        <div class="cabin"><div class="c-win"></div><div class="c-win w2"></div></div>
+        <div class="c-body"></div>
+        <div class="wheel w1"></div>
+        <div class="wheel w2"></div>
+      </div>
+
+      <div class="person" onclick="talkToPerson(this)">
+        🧑
+        <div class="speech" id="speechBubble"></div>
+      </div>
+
+      <div class="tip">Siram bunga, naik mobil, ngobrol dengan orangnya, atau lihat-lihat rumahnya 🌼</div>
+    </div>
+
+    <div id="character">
+      <div class="char-shadow"></div>
+      <div class="char-flip">
+        <div class="char-head"></div>
+        <div class="char-shirt"></div>
+        <div class="char-legs"><div class="char-leg l"></div><div class="char-leg r"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function goRoom(name) {
+    document.querySelectorAll('.room').forEach(r => { r.classList.remove('active'); r.style.transform = ''; });
+    document.getElementById(name).classList.add('active');
+    document.querySelectorAll('.nav button').forEach(b => {
+      b.classList.toggle('active', b.dataset.room === name);
+    });
+    charX = 150; charY = 380;
+  }
+
+  function toggleClass(el, cls) { el.classList.toggle(cls); }
+
+  let toastTimer = null;
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 1700);
+  }
+
+  function toggleCatSleep(el) {
+    el.classList.toggle('awake');
+    const awake = el.classList.contains('awake');
+    const heart = el.querySelector('.heart-burst');
+    heart.classList.remove('show');
+    void heart.offsetWidth;
+    heart.classList.add('show');
+    showToast(awake ? 'Kucing bangun! "Ngeong~" 🐾' : 'Kucing tidur lagi... 💤');
+  }
+
+  /* ===== Dapur: kulkas, lemari, memasak ===== */
+  function toggleFridge(panel) {
+    const fridge = panel.parentElement;
+    fridge.classList.toggle('open');
+    showToast(fridge.classList.contains('open') ? 'Kulkas dibuka' : 'Kulkas ditutup');
+  }
+  function toggleCabinet(el) {
+    el.classList.toggle('open');
+    showToast(el.classList.contains('open') ? 'Lemari dapur dibuka' : 'Lemari dapur ditutup');
+  }
+  function snackFridge(msg, event) {
+    if (event) event.stopPropagation();
+    showToast(msg);
+  }
+  let hasBeef = false, hasCarrot = false;
+  function addIngredient(type, el, event) {
+    if (event) event.stopPropagation();
+    if (type === 'beef') { hasBeef = true; showToast('Daging sapi ditambahkan ke panci 🥩'); }
+    if (type === 'carrot') { hasCarrot = true; showToast('Wortel ditambahkan ke panci 🥕'); }
+    el.classList.add('used');
+    document.getElementById('potHint').classList.toggle('show', hasBeef && hasCarrot);
+  }
+  function eatCream(el, event) {
+    if (event) event.stopPropagation();
+    el.classList.remove('bounce');
+    void el.offsetWidth;
+    el.classList.add('bounce');
+    showToast('Cream lembut & manis, enak sekali! 🍦😋');
+  }
+  function toggleStove(el) {
+    el.classList.toggle('on');
+    const isOn = el.classList.contains('on');
+    if (isOn && hasBeef && hasCarrot) {
+      el.classList.add('cooked');
+      showToast('Sup daging & wortel matang! 🍲✨ Selamat makan');
+      hasBeef = false; hasCarrot = false;
+      document.getElementById('potHint').classList.remove('show');
+      document.querySelectorAll('.fridge .food.used').forEach(f => f.classList.remove('used'));
+    } else if (isOn) {
+      showToast('Kompor dinyalakan 🔥');
+    } else {
+      el.classList.remove('cooked');
+      showToast('Kompor dimatikan');
+    }
+  }
+
+  /* ===== Luar rumah ===== */
+  function viewHouse() { showToast('Rumah yang nyaman dan asri 🏡✨'); }
+  function waterPlant(el) {
+    el.classList.remove('watered');
+    void el.offsetWidth;
+    el.classList.add('watered');
+    showToast('Tanaman disiram, makin segar 🌱💧');
+  }
+  function toggleCar(el) {
+    el.classList.toggle('in');
+    showToast(el.classList.contains('in') ? 'Kamu masuk ke mobil 🚗🔑' : 'Kamu keluar dari mobil');
+  }
+  const greetings = [
+    'Halo! Cuaca hari ini cerah ya ☀️',
+    'Rumahmu bagus sekali! 🏡',
+    'Sudah kasih makan kucingnya hari ini? 🐱',
+    'Selamat menikmati harimu! 😊'
+  ];
+  let greetIndex = 0;
+  function talkToPerson(el) {
+    const msg = greetings[greetIndex % greetings.length];
+    greetIndex++;
+    document.getElementById('speechBubble').textContent = msg;
+    el.classList.remove('talk');
+    void el.offsetWidth;
+    el.classList.add('talk');
+    showToast(msg);
+  }
+
+  /* ===== Karakter pemain: gerak keyboard + kamera mengikuti arah ===== */
+  const keys = {};
+  const MOVE_KEYS = ['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'];
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (MOVE_KEYS.includes(k)) e.preventDefault();
+    keys[k] = true;
+    if ((k === ' ' || k === 'spacebar' || e.code === 'Space') && !isJumping) {
+      e.preventDefault();
+      isJumping = true;
+      charEl.classList.add('jumping');
+      showToast('Lompat! 🦘');
+      setTimeout(() => { charEl.classList.remove('jumping'); isJumping = false; }, 500);
+    }
+  });
+  window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+  const charEl = document.getElementById('character');
+  let charX = 150, charY = 380;
+  let isJumping = false;
+  const SPEED = 3;
+  const BOUNDS = { minX: 20, maxX: 714, minY: 300, maxY: 408 };
+  const CAM_MID_X = (BOUNDS.minX + BOUNDS.maxX) / 2;
+  const CAM_MID_Y = (BOUNDS.minY + BOUNDS.maxY) / 2;
+
+  function gameLoop() {
+    let dx = 0, dy = 0;
+    if (keys['arrowleft'] || keys['a']) dx -= 1;
+    if (keys['arrowright'] || keys['d']) dx += 1;
+    if (keys['arrowup'] || keys['w']) dy -= 1;
+    if (keys['arrowdown'] || keys['s']) dy += 1;
+
+    const moving = dx !== 0 || dy !== 0;
+    if (moving) {
+      const len = Math.hypot(dx, dy) || 1;
+      charX += (dx / len) * SPEED;
+      charY += (dy / len) * SPEED;
+      charX = Math.min(BOUNDS.maxX, Math.max(BOUNDS.minX, charX));
+      charY = Math.min(BOUNDS.maxY, Math.max(BOUNDS.minY, charY));
+      charEl.classList.add('walking');
+      if (dx < 0) charEl.classList.add('facing-left');
+      else if (dx > 0) charEl.classList.remove('facing-left');
+    } else {
+      charEl.classList.remove('walking');
+    }
+
+    charEl.style.left = charX + 'px';
+    charEl.style.top = charY + 'px';
+
+    // FOV / kamera mengikuti posisi & arah jalan karakter secara halus
+    const activeRoom = document.querySelector('.room.active');
+    if (activeRoom) {
+      const offsetX = (charX - CAM_MID_X) * -0.07 + dx * -6;
+      const offsetY = (charY - CAM_MID_Y) * -0.07 + dy * -6;
+      activeRoom.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(1.02)`;
+    }
+
+    requestAnimationFrame(gameLoop);
+  }
+  requestAnimationFrame(gameLoop);
+</script>
+
+</body>
+</html>
