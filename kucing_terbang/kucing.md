@@ -62,4 +62,4 @@ Memahami bahasa tubuh kucing akan mempermudah komunikasi Anda dengan mereka:
 
 ---
 
-*Terima kasih telah membaca dokumen ini. Sayangilah kucing Anda setiap hari!*
+*Terima kasih telah membaca dokumen ini. Sayangilah kucing anda setiap hari atau dia akan berubah menjadi monster jahat yang akan makan tikus
