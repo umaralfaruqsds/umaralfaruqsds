@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Kucing 3D di Ruangan</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: radial-gradient(ellipse at center, #3a3550 0%, #1c1930 100%);
+    font-family: Georgia, serif;
+    overflow: hidden;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ===== STAGE 3D ===== */
+  .stage {
+    perspective: 1400px;
+    perspective-origin: 50% 40%;
+    width: 720px;
+    height: 580px;
+    opacity: 0;
+    animation: stageIn 1.4s ease forwards 0.2s;
+  }
+  @keyframes stageIn {
+    0% { opacity: 0; transform: scale(0.85) translateY(30px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  .room {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transform: rotateX(6deg) rotateY(-18deg);
+    animation: roomSway 9s ease-in-out infinite alternate;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.5);
+    border-radius: 14px;
+  }
+  @keyframes roomSway {
+    0%   { transform: rotateX(6deg) rotateY(-18deg); }
+    50%  { transform: rotateX(4deg) rotateY(6deg); }
+    100% { transform: rotateX(7deg) rotateY(-10deg); }
+  }
+
+  .face {
+    position: absolute;
+    backface-visibility: hidden;
+  }
+
+  /* Dinding belakang */
+  .wall-back {
+    width: 700px; height: 420px;
+    left: 10px; top: 0;
+    background: linear-gradient(180deg, #e9d2b4 0%, #dcb98f 100%);
+    transform: translateZ(-160px);
+    box-shadow: inset 0 0 90px rgba(0,0,0,0.15);
+  }
+  /* Dinding samping kiri (memberi kedalaman) */
+  .wall-left {
+    width: 160px; height: 420px;
+    left: 10px; top: 0;
+    background: linear-gradient(90deg, #c9a578, #dcb98f);
+    transform-origin: left center;
+    transform: rotateY(90deg) translateZ(0px) translateX(0px);
+  }
+  /* Lantai (bidang horizontal) */
+  .floor {
+    width: 700px; height: 320px;
+    left: 10px; top: 400px;
+    background:
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.06) 0 4px, transparent 4px 90px),
+      linear-gradient(180deg, #b0784a 0%, #8a5a30 100%);
+    transform-origin: top center;
+    transform: rotateX(90deg) translateZ(0px);
+    box-shadow: inset 0 0 120px rgba(0,0,0,0.25);
+  }
+  .baseboard {
+    width: 700px; height: 10px;
+    left: 10px; top: 400px;
+    background: #f3ead9;
+    transform: translateZ(-159px);
+  }
+
+  /* Jendela dengan kedalaman bingkai */
+  .window {
+    width: 170px; height: 190px;
+    left: 70px; top: 55px;
+    background: linear-gradient(180deg, #bfe6ff, #eaf7ff);
+    border: 10px solid #f7f2e7;
+    border-radius: 6px;
+    transform: translateZ(-158px);
+    box-shadow: 0 0 30px rgba(255,255,255,0.15);
+  }
+  .window::before, .window::after { content:""; position:absolute; background:#f7f2e7; }
+  .window::before { top:50%; left:0; right:0; height:8px; transform:translateY(-50%); }
+  .window::after  { left:50%; top:0; bottom:0; width:8px; transform:translateX(-50%); }
+  .sun {
+    position: absolute; top: 18px; left: 12px;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: radial-gradient(circle, #fff6c9, #ffe28a);
+    animation: glow 2.4s ease-in-out infinite alternate;
+  }
+  @keyframes glow {
+    0% { box-shadow: 0 0 14px 4px rgba(255,226,138,0.5); }
+    100% { box-shadow: 0 0 26px 10px rgba(255,226,138,0.85); }
+  }
+  .cloud { position:absolute; background:#fff; border-radius:50%; opacity:.85; }
+  .cloud.c1 { width:46px; height:18px; top:42px; left:14px; animation: driftCloud 12s linear infinite; }
+  .cloud.c2 { width:32px; height:13px; top:100px; left:60px; animation: driftCloud 16s linear infinite reverse; }
+  @keyframes driftCloud {
+    0% { transform: translateX(0); }
+    50% { transform: translateX(10px); }
+    100% { transform: translateX(0); }
+  }
+
+  .curtain {
+    width: 46px; height: 210px;
+    top: 40px;
+    background: linear-gradient(180deg, #e5988f, #d97b70);
+    border-radius: 10px 10px 4px 4px;
+    transform: translateZ(-140px);
+    transform-origin: top center;
+    animation: curtainSway 4.5s ease-in-out infinite;
+  }
+  .curtain.left  { left: 74px; animation-delay: 0s; }
+  .curtain.right { left: 258px; animation-delay: 0.6s; }
+  @keyframes curtainSway {
+    0%, 100% { transform: translateZ(-140px) rotate(-3deg); }
+    50%      { transform: translateZ(-140px) rotate(3deg); }
+  }
+
+  .frame {
+    width: 90px; height: 70px;
+    left: 510px; top: 100px;
+    background: #f9f5ec;
+    border: 6px solid #b5793f;
+    border-radius: 4px;
+    transform: translateZ(-158px);
+    display: flex; align-items:center; justify-content:center;
+    font-size: 26px;
+  }
+
+  .plant-pot {
+    width: 46px; height: 40px;
+    left: 560px; top: 358px;
+    background: linear-gradient(180deg, #c96b4e, #a84f36);
+    border-radius: 0 0 10px 10px;
+    transform: translateZ(-40px);
+  }
+  .plant-leaf {
+    width: 14px; height: 46px;
+    left: 566px; top: 314px;
+    background: #4c8c52;
+    border-radius: 50% 50% 0 50%;
+    transform-origin: bottom center;
+    transform: translateZ(-40px) rotate(-18deg);
+    animation: leafSway 3.4s ease-in-out infinite;
+  }
+  .plant-leaf.l2 { left: 554px; top: 302px; height: 58px; background:#5aa15f; transform: translateZ(-40px) rotate(6deg); animation-delay: .3s; }
+  .plant-leaf.l3 { left: 578px; top: 320px; height: 40px; transform: translateZ(-40px) rotate(24deg); animation-delay: .6s; }
+  @keyframes leafSway {
+    0%, 100% { rotate: -4deg; }
+    50% { rotate: 4deg; }
+  }
+
+  .rug {
+    width: 300px; height: 90px;
+    left: 210px; top: 470px;
+    background: #d8c19f;
+    border: 6px solid #c2a679;
+    border-radius: 50%;
+    transform: rotateX(90deg) translateZ(-2px);
+  }
+  .shadow {
+    width: 190px; height: 26px;
+    left: 265px; top: 468px;
+    background: rgba(0,0,0,0.22);
+    border-radius: 50%;
+    filter: blur(4px);
+    transform: rotateX(90deg) translateZ(-1px);
+  }
+
+  /* ===== KUCING 3D ===== */
+  .cat {
+    position: absolute;
+    left: 250px; top: 220px;
+    width: 220px; height: 210px;
+    transform-style: preserve-3d;
+    transform: translateZ(40px);
+    animation: catIn 1s ease forwards 1s, breathe 3.2s ease-in-out infinite 2s;
+    opacity: 0;
+  }
+  @keyframes catIn {
+    0% { opacity: 0; transform: translateZ(40px) translateY(30px) scale(0.7) rotateY(0deg); }
+    70% { opacity: 1; }
+    100% { opacity: 1; transform: translateZ(40px) translateY(0) scale(1) rotateY(360deg); }
+  }
+  @keyframes breathe {
+    0%, 100% { transform: translateZ(40px) scale(1); }
+    50% { transform: translateZ(40px) scale(1.025); }
+  }
+
+  .tail {
+    position: absolute;
+    bottom: 18px; left: -34px;
+    width: 26px; height: 90px;
+    background: linear-gradient(100deg, #e8934f, #f7b46a 60%, #e8934f);
+    border-radius: 50% 50% 60% 40% / 60% 60% 40% 40%;
+    transform-origin: bottom center;
+    transform: translateZ(-10px) rotate(35deg);
+    box-shadow: inset -4px 0 6px rgba(0,0,0,0.15);
+    animation: tailWag 2.2s ease-in-out infinite;
+  }
+  @keyframes tailWag {
+    0%, 100% { transform: translateZ(-10px) rotate(30deg); }
+    50%      { transform: translateZ(-10px) rotate(50deg); }
+  }
+
+  .body {
+    position: absolute;
+    bottom: 0; left: 30px;
+    width: 150px; height: 110px;
+    background: linear-gradient(160deg, #f7b46a, #ee9a4e 70%);
+    border-radius: 50% 50% 45% 45% / 60% 60% 40% 40%;
+    box-shadow: inset -14px -10px 20px rgba(0,0,0,0.12);
+    transform: translateZ(0px);
+  }
+  .belly {
+    position: absolute;
+    bottom: 0; left: 60px;
+    width: 92px; height: 75px;
+    background: #fbe3c4;
+    border-radius: 50% 50% 45% 45% / 60% 60% 40% 40%;
+    transform: translateZ(6px);
+  }
+  .paw {
+    position: absolute;
+    bottom: -6px;
+    width: 30px; height: 22px;
+    background: #fbe3c4;
+    border-radius: 50%;
+    box-shadow: inset 0 -4px 4px rgba(0,0,0,0.08);
+    transform: translateZ(10px);
+  }
+  .paw.p1 { left: 48px; }
+  .paw.p2 { left: 130px; }
+
+  .head {
+    position: absolute;
+    bottom: 84px; left: 45px;
+    width: 140px; height: 122px;
+    background: linear-gradient(155deg, #f7b46a, #ee9a4e 75%);
+    border-radius: 50%;
+    box-shadow: inset -12px -10px 18px rgba(0,0,0,0.12);
+    transform: translateZ(14px);
+    animation: headTilt 3.6s ease-in-out infinite;
+    transform-style: preserve-3d;
+  }
+  @keyframes headTilt {
+    0%, 100% { transform: translateZ(14px) rotate(0deg); }
+    50%      { transform: translateZ(14px) rotate(3deg); }
+  }
+
+  .ear {
+    position: absolute;
+    bottom: 178px;
+    width: 0; height: 0;
+    border-left: 32px solid transparent;
+    border-right: 32px solid transparent;
+    border-bottom: 54px solid #ee9a4e;
+    transform: translateZ(12px);
+  }
+  .ear.left  { left: 42px; transform: translateZ(12px) rotate(-24deg); }
+  .ear.right { left: 148px; transform: translateZ(12px) rotate(24deg); }
+  .ear-inner {
+    position: absolute; bottom: 6px;
+    width: 0; height: 0;
+    border-left: 16px solid transparent;
+    border-right: 16px solid transparent;
+    border-bottom: 28px solid #ffcaa4;
+  }
+  .ear.left .ear-inner  { left: -16px; }
+  .ear.right .ear-inner { left: -16px; }
+
+  .stripe { position:absolute; background:#d9822f; opacity:.55; border-radius:4px; }
+  .stripe.s1 { width:30px; height:6px; top:-4px; left:30px; transform: rotate(20deg); }
+  .stripe.s2 { width:26px; height:6px; top:-4px; right:30px; transform: rotate(-20deg); }
+
+  .cheek {
+    position: absolute; bottom: 108px;
+    width: 22px; height: 14px;
+    background: #ff9fa8; border-radius: 50%; opacity: .6;
+    transform: translateZ(18px);
+    animation: cheekPulse 3.2s ease-in-out infinite;
+  }
+  .cheek.left { left: 56px; }
+  .cheek.right { left: 142px; }
+  @keyframes cheekPulse {
+    0%, 100% { opacity: .5; }
+    50%      { opacity: .75; }
+  }
+
+  .eye {
+    position: absolute; bottom: 130px;
+    width: 13px; height: 17px;
+    background: #2b2b2b; border-radius: 50%;
+    transform: translateZ(20px);
+    animation: blink 4.6s ease-in-out infinite;
+  }
+  .eye.left  { left: 78px; }
+  .eye.right { left: 130px; animation-delay: 0.05s; }
+  .eye::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 4px; height: 4px; background: #fff; border-radius: 50%;
+  }
+  @keyframes blink {
+    0%, 92%, 100% { transform: translateZ(20px) scaleY(1); }
+    96%           { transform: translateZ(20px) scaleY(0.1); }
+  }
+
+  .nose {
+    position: absolute; bottom: 116px; left: 50%;
+    transform: translateX(-50%) translateZ(20px);
+    width: 0; height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 7px solid #ff8fa3;
+  }
+  .mouth {
+    position: absolute; bottom: 100px; left: 50%;
+    width: 26px; height: 12px;
+    transform: translateX(-50%) translateZ(20px);
+    border-bottom: 2px solid #5a3b28;
+    border-radius: 0 0 14px 14px;
+  }
+  .whisker { position:absolute; height:2px; background:rgba(60,40,25,0.5); transform: translateZ(18px); }
+  .whisker.l1 { bottom:118px; left:30px; width:40px; transform: translateZ(18px) rotate(-6deg); }
+  .whisker.l2 { bottom:108px; left:28px; width:40px; transform: translateZ(18px); }
+  .whisker.r1 { bottom:118px; left:150px; width:40px; transform: translateZ(18px) rotate(6deg); }
+  .whisker.r2 { bottom:108px; left:152px; width:40px; transform: translateZ(18px); }
+
+  .hint {
+    position: absolute;
+    bottom: -34px; left: 50%;
+    transform: translateX(-50%);
+    color: #cfc7e6;
+    font-size: 13px;
+    opacity: 0.7;
+    letter-spacing: .5px;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <div class="room" id="room">
+    <div class="face wall-back"></div>
+    <div class="face wall-left"></div>
+    <div class="face floor"></div>
+    <div class="face baseboard"></div>
+
+    <div class="face window">
+      <div class="sun"></div>
+      <div class="cloud c1"></div>
+      <div class="cloud c2"></div>
+    </div>
+    <div class="face curtain left"></div>
+    <div class="face curtain right"></div>
+
+    <div class="face frame">🐾</div>
+
+    <div class="face plant-leaf l2"></div>
+    <div class="face plant-leaf l1"></div>
+    <div class="face plant-leaf l3"></div>
+    <div class="face plant-pot"></div>
+
+    <div class="face rug"></div>
+    <div class="face shadow"></div>
+
+    <div class="cat">
+      <div class="tail"></div>
+      <div class="body"></div>
+      <div class="belly"></div>
+      <div class="paw p1"></div>
+      <div class="paw p2"></div>
+
+      <div class="ear left"><div class="ear-inner"></div></div>
+      <div class="ear right"><div class="ear-inner"></div></div>
+      <div class="head">
+        <div class="stripe s1"></div>
+        <div class="stripe s2"></div>
+      </div>
+      <div class="cheek left"></div>
+      <div class="cheek right"></div>
+      <div class="eye left"></div>
+      <div class="eye right"></div>
+      <div class="nose"></div>
+      <div class="mouth"></div>
+      <div class="whisker l1"></div>
+      <div class="whisker l2"></div>
+      <div class="whisker r1"></div>
+      <div class="whisker r2"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Interaksi: gerakkan mouse untuk memutar ruangan secara halus (mengganti animasi otomatis sementara)
+  const room = document.getElementById('room');
+  const stage = document.getElementById('stage');
+  let auto = true;
+
+  stage.addEventListener('mousemove', (e) => {
+    auto = false;
+    room.style.animation = 'none';
+    const rect = stage.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    room.style.transform = `rotateX(${6 - y * 14}deg) rotateY(${-18 + x * 28}deg)`;
+  });
+
+  stage.addEventListener('mouseleave', () => {
+    room.style.animation = 'roomSway 9s ease-in-out infinite alternate';
+  });
+</script>
+
+</body>
+</html>

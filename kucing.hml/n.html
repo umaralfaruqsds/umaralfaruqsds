@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulasi Rumah Kucing 3D Photorealistic Final</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        /* UI HUD GAME OVERLAY */
+        .hud-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(15, 23, 42, 0.85);
+            border: 2px solid #334155;
+            padding: 20px;
+            border-radius: 12px;
+            color: #f8fafc;
+            width: 320px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            backdrop-filter: blur(8px);
+            z-index: 10;
+        }
+        .hud-panel h2 {
+            font-size: 18px;
+            margin-bottom: 12px;
+            color: #fbbf24;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 6px;
+        }
+        .hud-status {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+        .inventory-list {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .inv-item {
+            width: 50px;
+            height: 50px;
+            background: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            position: relative;
+            opacity: 0.3;
+            transition: opacity 0.3s;
+        }
+        .inv-item.owned { opacity: 1; border-color: #fbbf24; }
+        
+        /* INTERACTION CONTROL BUTTONS */
+        .control-menu {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            background: rgba(15, 23, 42, 0.7);
+            padding: 12px 25px;
+            border-radius: 30px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            z-index: 10;
+        }
+        .btn-action {
+            padding: 10px 20px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        .btn-action:hover { background: #1d4ed8; transform: translateY(-2px); }
+        .btn-action.cooking { background: #dc2626; }
+        
+        /* INSTRUCTION TO ORBIT */
+        .orbit-guide {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: rgba(255,255,255,0.5);
+            font-size: 12px;
+            background: rgba(0,0,0,0.4);
+            padding: 8px 12px;
+            border-radius: 6px;
+            pointer-events: none;
+        }
+    </style>
+    <!-- Memuat Three.js dan OrbitControls untuk Navigasi Kamera Nyata -->
+    <script src="https://cloudflare.com"></script>
+    <script src="https://jsdelivr.net"></script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <!-- HUD Kontrol & Game State -->
+    <div class="hud-panel">
+        <h2>📋 Status RPG Rumah</h2>
+        <div class="hud-status" id="status-text">Kucing sedang tidur nyenyak di sofa ruang tamu. Gerakkan mouse/layar untuk memutar kamera dunia 3D.</div>
+        
+        <h2>🎒 Tas Bahan Masak</h2>
+        <div class="inventory-list">
+            <div class="inv-item" id="item-meat" title="Daging Sapi">🥩</div>
+            <div class="inv-item" id="item-carrot" title="Wortel">🥕</div>
+            <div class="inv-item" id="item-icecream" title="Es Krim">🍦</div>
+        </div>
+    </div>
+
+    <!-- Menu Aksi Cepat Interaksi -->
+    <div class="control-menu">
+        <button class="btn-action" onclick="triggerCat()">🐱 Bangunkan Kucing</button>
+        <button class="btn-action" onclick="triggerWindow()">🪟 Buka/Tutup Jendela</button>
+        <button class="btn-action" onclick="gatherIngredients()">🛒 Buka Kulkas (Ambil Bahan)</button>
+        <button class="btn-action cooking" onclick="cookSoup()">🍳 Masak Sup Daging</button>
+        <button class="btn-action" onclick="driveCar()">🚗 Jalankan Mobil</button>
+    </div>
+
+    <div class="orbit-guide">🖱️ Klik & Tahan Mouse untuk Memutar Kamera 3D</div>
+
+    <script>
+        // --- CONFIG STRUKTUR UTAMA THREE.JS ---
+        let scene, camera, renderer, controls;
+        let cat, leftWindowWing, rightWindowWing, car, potPlant;
+        let catAwake = false, windowOpen = false, carMoving = false;
+        let hasMeat = false, hasCarrot = false, hasIceCream = false;
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            
+            // 1. Pembuatan Scene & Kabut Atmosfer
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a1118);
+            scene.fog = new THREE.FogExp2(0x0a1118, 0.015);
+
+            // 2. Kamera Perspektif Realistis
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(15, 12, 20);
+
+            // 3. Renderer dengan Bayangan Halus (Soft Shadows)
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            container.appendChild(renderer.domElement);
+
+            // 4. Orbit Controls (Supaya bisa dijelajahi/diputar bebas tanpa bug)
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05; // Mencegah kamera tembus ke bawah lantai
+
+            // 5. Sistem Pencahayaan Studio Realistis
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.DirectionalLight(0xfff8e7, 1.2);
+            sunLight.position.set(20, 30, 15);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            sunLight.shadow.bias = -0.001;
+            scene.add(sunLight);
+
+            const indoorLight = new THREE.PointLight(0xffaa44, 1.5, 15);
+            indoorLight.position.set(0, 5, 0);
+            indoorLight.castShadow = true;
+            scene.add(indoorLight);
+
+            buildWorld();
+            animate();
+        }
+
+        // --- MEMBANGUN ELEMEN DIORAMA DUNIA NYATA ---
+        function buildWorld() {
+            // A. Tanah / Halaman Luar (Gras)
+            const grassGeo = new THREE.PlaneGeometry(100, 100);
+            const grassMat = new THREE.MeshStandardMaterial({ color: 0x1e3f20, roughness: 0.9 });
+            const grass = new THREE.Mesh(grassGeo, grassMat);
+            grass.rotation.x = -Math.PI / 2;
+            grass.receiveShadow = true;
+            scene.add(grass);
+
+            // B. Struktur Rumah Modern (Dinding & Ruangan Terbuka)
+            const houseGroup = new THREE.Group();
+            
+            // Lantai Kayu Interior
+            const floorGeo = new THREE.BoxGeometry(12, 0.2, 12);
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x8a5a36, roughness: 0.4 });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.position.y = 0.1;
+            floor.receiveShadow = true;
+            houseGroup.add(floor);
+
+            // Dinding Utama Belakang
+            const wallBackGeo = new THREE.BoxGeometry(12, 7, 0.4);
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.6 });
+            const wallBack = new THREE.Mesh(wallBackGeo, wallMat);
+            wallBack.position.set(0, 3.5, -6);
+            wallBack.castShadow = true;
+            wallBack.receiveShadow = true;
+            houseGroup.add(wallBack);
+
+            // C. Jendela Mekanis 3D (Berengsel)
+            const windowFrameGeo = new THREE.BoxGeometry(4, 3, 0.2);
+            const windowFrameMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+            const frame = new THREE.Mesh(windowFrameGeo, windowFrameMat);
+            frame.position.set(0, 4, -5.8);
+            houseGroup.add(frame);
+
+            // Daun Jendela Kiri & Kanan
+            const wingGeo = new THREE.BoxGeometry(1.9, 2.8, 0.1);
+            const wingMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.6, roughness: 0.1 });
+            
+            leftWindowWing = new THREE.Mesh(wingGeo, wingMat);
+            leftWindowWing.position.set(-0.95, 4, -5.7);
+            houseGroup.add(leftWindowWing);
+
+            rightWindowWing = new THREE.Mesh(wingGeo, wingMat);
+            rightWindowWing.position.set(0.95, 4, -5.7);
+            houseGroup.add(rightWindowWing);
+
+            // D. Furnitur Kursi Sofa Panjang Realistis
+            const sofa = new THREE.Group();
